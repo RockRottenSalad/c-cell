@@ -1,0 +1,14 @@
+
+The expr production is equivalent to the start_recurive_descent() function.
+Otherwise, every other production name matches the function name.
+
+expr -> term
+term -> factor (( "-" | "+" ) factor)*
+factor -> unary (("/" | "*") unary)*
+unary -> "-" unary | primary
+primary -> LITERAL | IDENTIFIER ("(" expr ")")?  | "(" expr ")"
+
+IDENTIFIER followed by parantheses makes a function.
+Without parentheses, it turns into a reference to another expression.
+
+

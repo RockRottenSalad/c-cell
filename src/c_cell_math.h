@@ -7,7 +7,7 @@ typedef struct ivec2 ivec2;
 struct ivec2 {
     union {
         int raw[2];
-        int x, y;
+        struct { int x, y; };
     };
 };
 

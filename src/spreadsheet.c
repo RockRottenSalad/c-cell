@@ -1,6 +1,7 @@
 
 #include "spreadsheet.h"
 #include "expression.h"
+#include "global_types.h"
 #include "token.h"
 #include "error.h"
 
@@ -9,12 +10,31 @@
 spreadsheet* new_spreadsheet(list(token) tokens) {
 
     spreadsheet *spreadsheet_ptr = calloc(1, sizeof(struct spreadsheet));
+    token *token_list = (token*)tokens->list;
+    size_t len = tokens->len;
 
-    spreadsheet_ptr->rows = 10;
-    spreadsheet_ptr->columns = 25;
+    size_t max_columns = 0;
+    spreadsheet_ptr->rows = 0;
+    for(size_t i = 0; i < len; i++) {
+        switch(token_list[i].kind) {
+            case NEWLINE:
+                spreadsheet_ptr->rows += 1;
+                max_columns++;
+                spreadsheet_ptr->columns = (spreadsheet_ptr->columns > max_columns ? spreadsheet_ptr->columns : max_columns);
+                max_columns = 0;
+                break;
+            case COMMA:
+                max_columns++;
+                break;
+            default:
+                break;
+        }
+    }
+
+//    spreadsheet_ptr->rows = 10;
+//    spreadsheet_ptr->columns = 25;
 
     {
-        // TODO: Determine rows/cols from tokens
         void *mem = calloc(spreadsheet_ptr->rows * spreadsheet_ptr->columns, sizeof(struct cell));
         spreadsheet_ptr->sheet = calloc(spreadsheet_ptr->rows, sizeof(struct cell));
 
@@ -23,10 +43,8 @@ spreadsheet* new_spreadsheet(list(token) tokens) {
         }
     }
 
-    size_t len = tokens->len;
     size_t col = 0, row = 0;
 
-    token *token_list = (token*)tokens->list;
     for(size_t i = 0; i < len; i++) {
         switch(token_list[i].kind) {
             case COMMA:
@@ -97,20 +115,25 @@ void spreadsheet_evaluate_expressions(spreadsheet *spreadsheet_ptr) {
     }
 }
 
-// TODO: String builder instead of separate prints you twat
 void spreadsheet_print(spreadsheet *spreadsheet_ptr, FILE *fd) {
     for(int r = 0; r < (int)spreadsheet_ptr->rows; r++) {
         for(int c = 0; c < (int)spreadsheet_ptr->columns; c++) {
+            if(has_had_error()) {
+                while(has_had_error()) {
+                    LOG("ERR: %s", get_error().message);
+                }
+                PANIC("Error while printing spreadsheet");
+            }
             switch(spreadsheet_ptr->sheet[r][c].kind) {
                 case TEXT:
-                    fprintf(fd, "[%d, %d]%.*s,",
-                            r, c, (int)spreadsheet_ptr->sheet[r][c].text.len, spreadsheet_ptr->sheet[r][c].text.str);
+                    fprintf(fd, "[%c%d]%.*s,\t",
+                            65+c, r, (int)spreadsheet_ptr->sheet[r][c].text.len, spreadsheet_ptr->sheet[r][c].text.str);
                     break;
                 case EXPRESSION:
-                    fprintf(fd, "[%d, %d]%lf,", r, c, evaluate(spreadsheet_ptr->sheet[r][c].expr, spreadsheet_ptr));
+                        fprintf(fd, "[%c%d]%.1lf,\t", 65+c, r, evaluate(spreadsheet_ptr->sheet[r][c].expr, spreadsheet_ptr));
                     break;
                 case EMPTY:
-                    fprintf(fd, ",");
+                    fprintf(fd, "\t");
                     break;
             }
         }

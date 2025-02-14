@@ -27,8 +27,6 @@ void* _new_list(size_t type_size, size_t initial_capacity);
 
 void delete_list(struct dynamic_list *list_ptr);
 
-void _list_grow(struct dynamic_list *meta_data, size_t capacity);
-
 #define list_push_rv(LIST, DATA)\
 do{\
 typeof(DATA) __r = DATA;\

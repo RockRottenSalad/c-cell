@@ -31,6 +31,7 @@ enum expression_kind : char {
     BINARY_EXPRESSION,
     QUANTITY_EXPRESSION,
     REFERENCE_EXPRESSION,
+    FUNCTION_EXPRESSION,
     LITERAL
 };
 
@@ -41,6 +42,31 @@ enum operator : char {
     DIVISION,
     NEGATION = SUBTRACTION
 };
+
+enum function_ptr_return : char {
+    NUM, // NUMBER already taken
+    NUMS,
+    ID, // IDENTIFIER already taken
+    IDS,
+    EXPR, // EXPRESSION already taken
+    EXPRS,
+    INVALID
+};
+
+// Anything is used by function expressions for return types and arguments
+typedef struct anything anything;
+typedef anything* anything_ptr;
+struct anything {
+    union {
+        double number;
+        list(double) numbers;
+        char *id;
+        list(char_ptr) ids;
+    };
+    enum function_ptr_return kind;
+};
+
+typedef anything(*expression_function)(list(expression*), spreadsheet*);
 
 typedef struct expression expression;
 typedef expression* expression_ptr;
@@ -55,6 +81,10 @@ struct expression {
             expression *right;
             enum operator binary_operator;
         };
+        struct { // Function expr
+            expression_function function;
+            list(anything) arguments;
+        };
         expression *quantity_expr; // Quantity expr
         double number; // Literal
         char *identifier; // Reference expr
@@ -63,5 +93,9 @@ struct expression {
 };
 
 DEFINE_RESULT_TYPE(expression_ptr);
+DEFINE_RESULT_TYPE(expression);
+DEFINE_RESULT_TYPE(anything_ptr);
+DEFINE_RESULT_TYPE(anything);
+DEFINE_RESULT_TYPE(expression_function);
 
 #endif /* GLOBAL_TYPES_H */

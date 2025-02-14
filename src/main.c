@@ -43,13 +43,12 @@ int main(int argc, char **argv) {
     spreadsheet_print(sh, stdout);
 
     delete_spreadsheet(sh);
-
-    
     delete_scanner(sc);
     delete_buffered_reader(br);
+
     cleanup_error_logging();
 
-    printf("Hello, World\n");
+//    printf("Hello, World\n");
     return 0;
 }
 // size_t len = list_len(sc->tokens);

@@ -13,8 +13,10 @@ expression* new_unary_expression(enum operator unary_operator, expression *opera
 expression* new_quantity_expression(expression *quantity_expr);
 expression* new_literal_expression(double number);
 expression* new_reference_expression(char *id);
+expression* new_function_expression(expression_function function, list(expression_ptr) arguments);
+
 double evaluate(expression *expr, struct spreadsheet *sheet);
-void expression_determine_dependencies(expression *expr, list(ivec2) output);
+void expression_determine_dependencies(expression *expr, list(ivec2) output, spreadsheet *spreadsheet_ptr);
 
 void delete_expression(expression *expr);
 

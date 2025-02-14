@@ -28,6 +28,7 @@ void delete_list(struct dynamic_list *list_ptr) {
     free(list_ptr);
 }
 
+static inline
 void _list_grow(struct dynamic_list *list_ptr, size_t capacity) {
     if(capacity < list_ptr->capacity) {
         PANIC("Attempted to shrink list with _list_grow()");
@@ -35,11 +36,23 @@ void _list_grow(struct dynamic_list *list_ptr, size_t capacity) {
 
     list_ptr->list = realloc(list_ptr->list, capacity * list_ptr->type_size);
 
-    memset(((char*)list_ptr->list) + (list_ptr->len * list_ptr->type_size),
+    // Initialize the new memory
+    memset(list_ptr->list + (list_ptr->len * list_ptr->type_size),
            0, 
            (capacity - list_ptr->capacity) * list_ptr->type_size);
 
     list_ptr->capacity = capacity;
+}
+
+static inline
+void _list_shrink(struct dynamic_list *list_ptr, size_t capacity) {
+    if(capacity > list_ptr->capacity) {
+        PANIC("Attempted to grow list with _list_shrink()");
+    }
+
+    list_ptr->list = realloc(list_ptr->list, capacity * list_ptr->type_size);
+    list_ptr->capacity = capacity;
+    if(list_ptr->len < capacity) list_ptr->len = capacity;
 }
 
 void list_push(struct dynamic_list *list_ptr, void *data) {
@@ -57,6 +70,11 @@ void list_push(struct dynamic_list *list_ptr, void *data) {
 
 void list_pop(struct dynamic_list *list_ptr) {
     list_ptr->len -= 1;
+    memset(list_ptr->list + (list_ptr->len * list_ptr->type_size), 0, list_ptr->type_size);
+
+    if(list_ptr->len <= list_ptr->capacity / 4) {
+        _list_shrink(list_ptr, list_ptr->capacity / 2);
+    }
 }
 
 /* QUEUE */

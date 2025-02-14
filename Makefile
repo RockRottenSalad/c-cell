@@ -1,7 +1,8 @@
 
 CC := gcc
-CFLAGS := -lm -Wall -Wextra -g -std=c23 -DLOGGING
+CFLAGS := -Wall -Wextra -g -std=c23 -DLOGGING
 CFLAGS_TEST := $(CFLAGS) -DTEST
+LINK_FLAGS := -lm
 OBJ := obj
 SRC := src
 BIN := bin
@@ -19,7 +20,7 @@ test_build:
 	$(CC) $(CFLAGS_TEST) -I./$(SRC) -c $(SRC)/main.c -o $(OBJ)/main.o
 
 all: $(OBJECTS)
-	$(CC) -lm $^ -o $(BIN)/$(OUTPUT)
+	$(CC) $(LINK_FLAGS) $^ -o $(BIN)/$(OUTPUT)
 
 $(OBJ)/%.o: $(SRC)/%.c
 	$(CC) $(CFLAGS) -I./$(SRC) -c $< -o $@

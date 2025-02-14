@@ -184,7 +184,9 @@ result(bool) scanner_start_scan(scanner *sc) {
 
     result(char) ch_result = bf_get_char(sc->br);
     while(ch_result.status == OK){
-        if(ch_result.result == '=' || isdigit(ch_result.result)) {
+        if(isspace(ch_result.result)) {
+            // Do nothing. Continue loop.
+        }else if(ch_result.result == '=' || isdigit(ch_result.result)) {
             sc->br->index--;
             _scanner_tokenize_expression(sc);
         }else {

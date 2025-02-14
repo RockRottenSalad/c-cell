@@ -6,7 +6,7 @@
 #include "result.h"
 #include "collections.h"
 
-// For the love of god, don't forgot to update this
+// NOTE for the love of god; don't forgot to update this
 #define TOKEN_BIT_FLAGS_COUNT 10
 
 enum token_kind : size_t {
