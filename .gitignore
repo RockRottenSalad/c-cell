@@ -1,0 +1,6 @@
+*.o
+bin/program
+vgcore*
+*.csv
+compile_flags.txt
+tags
