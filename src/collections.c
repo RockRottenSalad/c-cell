@@ -192,9 +192,35 @@ size_t _hash(byte *data, size_t size, size_t capacity) {
     return index % capacity;
 }
 
+
+void _hashmap_add(struct hashmap *hashmap_ptr, byte *key, byte *value);
+
+void _hashmap_grow(struct hashmap *hashmap_ptr, size_t capacity) {
+    struct hashmap prev_hashmap = *hashmap_ptr;
+
+    size_t full_type_size = sizeof(struct hashmap_entry) + prev_hashmap.key_size + prev_hashmap.type_size;
+
+    hashmap_ptr->entries = calloc(capacity, full_type_size);
+    hashmap_ptr->capacity = capacity;
+    hashmap_ptr->len = 0;
+
+    struct hashmap_entry *entry;
+    for(size_t i = 0; i < prev_hashmap.capacity; i++) {
+        entry = (struct hashmap_entry*)(prev_hashmap.entries + (full_type_size * i)); 
+        if(entry->empty) continue;
+        _hashmap_add(hashmap_ptr, entry->key, entry->value);
+
+        entry = entry->next;
+        while(entry != NULL) {
+            _hashmap_add(hashmap_ptr, entry->key, entry->value);
+            entry = entry->next;
+        }
+    } 
+
+    delete_hashmap(&prev_hashmap);
+}
+
 void _hashmap_resize(struct hashmap *hashmap_ptr, size_t capacity) {
-    (void)hashmap_ptr; (void)capacity;
-    PANIC("_hashmap_resize() is not implemented yet");
 }
 
 struct hashmap_entry* _hashmap_entry_alloc(struct hashmap *hashmap_ptr) {
@@ -235,6 +261,7 @@ void _hashmap_add(struct hashmap *hashmap_ptr, byte *key, byte *value) {
     memcpy(entry_ptr->key, key, hashmap_ptr->key_size);
     memcpy(entry_ptr->value, value, hashmap_ptr->type_size);
     entry_ptr->empty = false;
+    hashmap_ptr->len++;
 }
 
 void _hashmap_remove(struct hashmap *hashmap_ptr, byte *key) {
@@ -264,6 +291,8 @@ void _hashmap_remove(struct hashmap *hashmap_ptr, byte *key) {
         //memset(((byte*)entry) + sizeof(struct hashmap_entry), 0, hashmap_ptr->key_size + hashmap_ptr->type_size);
         entry->empty = true;
     }
+
+    hashmap_ptr->len--;
 }
 
 void* _hashmap_get(struct hashmap *hashmap_ptr, byte *key) {
