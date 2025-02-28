@@ -62,6 +62,7 @@ struct anything {
         list(double) numbers;
         char *id;
         list(char_ptr) ids;
+        list(expression_ptr) exprs;
     };
     enum function_ptr_return kind;
 };

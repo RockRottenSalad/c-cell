@@ -9,6 +9,11 @@
 #include<ctype.h>
 #include<float.h>
 
+static inline
+int min(int a, int b) { return (a < b ? a : b );  }
+static inline
+int max(int a, int b) { return (a < b ? b : a );  }
+
 expression* new_binary_expression(expression *left, enum operator binary_operator, expression *right) {
     expression *expr = malloc(sizeof(struct expression));
     expr->left = left;
@@ -142,10 +147,13 @@ double evaluate(expression *expr, struct spreadsheet *sheet) {
         case FUNCTION_EXPRESSION:
             anything result = expr->function(expr->arguments, sheet);
             // TODO temp solution for testing
-            if(result.kind != NUM) {
-                PANIC("Testing");
+            switch(result.kind) {
+                case NUM:
+                    return result.number;
+                    break;
+                default:
+                    PANIC("Testing");
             }
-            return result.number;
         case REFERENCE_EXPRESSION:
             if(sheet == NULL) {
                 report_error(NULL_PTR, "Attempted to evaluate reference expression and sheet pointer is NULL");
@@ -321,6 +329,36 @@ anything _sum(list(expression_ptr) arguments, spreadsheet *spreadsheet_ptr) {
     }
 
     return ((anything){.kind = NUM, .number = sum});
+}
+
+anything _range(list(expression_ptr) arguments, spreadsheet *spreadsheet_ptr) {
+    if(arguments->len != 2) {
+        report_error(SYNTAX_ERROR, "RANGE() expects 2 arguments");
+        return ((anything){.kind = INVALID});
+    }
+
+    expression **args = (expression**)arguments->list;
+    result(ivec2) v1 = expression_identifier_to_cell(args[0]->identifier, spreadsheet_ptr->columns, spreadsheet_ptr->rows);
+    result(ivec2) v2 = expression_identifier_to_cell(args[1]->identifier, spreadsheet_ptr->columns, spreadsheet_ptr->rows);
+    if(v1.status == ERROR || v2.status == ERROR) {
+        return ((anything){.kind = INVALID});
+    }
+
+    list(expression*) range = new_list(expression_ptr);
+
+    ivec2 start = ((ivec2){.y = min(v1.result.y, v2.result.y), .x = min(v1.result.x, v2.result.x)});
+    ivec2 end = ((ivec2){.y = max(v1.result.y, v2.result.y), .x = max(v1.result.x, v2.result.x)});
+
+    for(int row = start.y; row < end.y; row++)
+        for(int col = start.x; col < end.x; col++) {
+            if(row >= spreadsheet_ptr->rows 
+                || col >= spreadsheet_ptr->columns
+                || spreadsheet_ptr->sheet[row][col].kind != EXPRESSION) continue;
+
+            list_push(range, &spreadsheet_ptr->sheet[row][col].expr);
+        }
+
+    return ((anything){.kind = EXPRS, .exprs = range});
 }
 
 // TODO

@@ -48,10 +48,11 @@ int main(int argc, char **argv) {
 
     cleanup_error_logging();
 
-//    printf("Hello, World\n");
+    //    printf("Hello, World\n");
     return 0;
 }
-// size_t len = list_len(sc->tokens);
+
+//    size_t len = list_len(sc->tokens);
 //    token *tokens = sc->tokens->list;
 //    for(size_t i = 0; i < len; i++) {
 //        switch(tokens[i].kind) {

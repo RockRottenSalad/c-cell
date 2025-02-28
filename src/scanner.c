@@ -1,4 +1,5 @@
 
+#include "collections.h"
 #include "result.h"
 #include "token.h"
 #include "scanner.h"
@@ -48,11 +49,65 @@ result(bool) delete_scanner(scanner *sc) {
     RESULT_RETURN(bool, true);
 }
 
+result(bool) _scanner_expand_range_macro(scanner *sc, list(char) string_builder, char *start, char *end) {
+    // Error checks
+    if(!isalpha(start[0]) || !isalpha(end[0])) {
+        RESULT_ERROR_RETURN(bool, "Identifiers syntax is invalid", SYNTAX_ERROR);
+    }else if(start[0] > end[0]) {
+        RESULT_ERROR_RETURN(bool, "Backwards ranges not supported yet", NOT_IMPLEMENTED);
+    }else {
+        int len = strlen(start);
+        for(int i = 1; i < len; i++) {
+            if(!isdigit(start[i])) {
+                RESULT_ERROR_RETURN(bool, "Identifiers syntax is invalid", SYNTAX_ERROR);
+            }
+        }
+        len = strlen(end);
+        for(int i = 1; i < len; i++) {
+            if(!isdigit(end[i])) {
+                RESULT_ERROR_RETURN(bool, "Identifiers syntax is invalid", SYNTAX_ERROR);
+            }
+        }
+    }
+
+    // NOTE: Might overflow
+    const int start_row = strtol(&start[1], NULL, 10);
+    const int end_row = strtol(&end[1], NULL, 10);
+    printf("START ROW: %d, END ROW: %d\n", start_row, end_row);
+    if(start_row > 10 || end_row > 10) {
+        RESULT_ERROR_RETURN(bool, "Rows > 10 not supported yet", NOT_IMPLEMENTED);
+    }
+
+    const char start_column = start[0];
+    const char end_column = end[0];
+
+    // Caller's job to make sure this doesn't blow shit up
+    free(((token*)sc->tokens->list)[sc->tokens->len-1].string);
+    free(end);
+    list_pop(sc->tokens);
+
+    for(char c = start_column; c <= end_column; c++) {
+        for(int r = start_row; r <= end_row; r++) {
+            list_clear(string_builder);
+            list_push_rv(string_builder, c);
+
+            list_push_rv(string_builder, ((char)(r+48)));
+            list_push_rv(string_builder, '\0');
+            list_push_rv(sc->tokens,
+                         token_new_id(sc->br->line, sc->br->column, sc->br->index, strdup(string_builder->list))
+                         );
+        }
+    }
+
+
+    RESULT_RETURN(bool, true);
+}
+
 /*
 * Currently, cells that start with a digit are assumed to be an expression.
 * Missing a check for cases where the cell has text after digit
 */
-result(bool) _scanner_tokenize_expression(scanner *sc) {
+result(bool) _scanner_tokenize_expression(scanner *sc, list(char) string_builder) {
     list_push_rv(sc->tokens, token_new_ch(EQUALS, sc->br->line, sc->br->column, sc->br->index, '='));
 
     { 
@@ -62,6 +117,9 @@ result(bool) _scanner_tokenize_expression(scanner *sc) {
 
     bool ignore_next_comma = false;
 
+    // TODO
+    // The comma shit is absolutely hideous and it doesn't even fucking work 
+    // Find a way to remove it without making everything else blow up please
     for(result(char) expr_ch_result = bf_get_char(sc->br);
     expr_ch_result.status == OK;
     expr_ch_result = bf_get_char(sc->br)) {
@@ -80,12 +138,33 @@ result(bool) _scanner_tokenize_expression(scanner *sc) {
                 .line = sc->br->line, .column = sc->br->column, .index = sc->br->index};
 
             switch(expr_ch_result.result) {
+                case ':': // The one and only macro. I pinky promise
+                    if(sc->tokens->len == 0 || ((token*)sc->tokens->list)[sc->tokens->len-1].kind != IDENTIFIER) {
+                        RESULT_ERROR_RETURN(bool, "Expected identifier before ':'", SYNTAX_ERROR);
+                    }
+
+                    result(char) next = bf_get_char(sc->br);
+                    if(next.status == ERROR || !isalpha(next.result)) {
+                        RESULT_ERROR_RETURN(bool, "Expected identifier after ':'", SYNTAX_ERROR);
+                    }
+
+                    result(token) to = _scanner_identifier_token(sc, string_builder, next.result);
+                    if(to.status == ERROR) {
+                        RESULT_ERROR_RETURN(bool, "Expected identifier after ':'", SYNTAX_ERROR);
+                    }
+                    result(bool) m = _scanner_expand_range_macro(sc, 
+                                                string_builder,
+                                                ((token*)sc->tokens->list)[sc->tokens->len-1].string,
+                                                to.result.string
+                                                );
+                    if(m.status == ERROR) {
+                        PANIC("ERROR IN MACRO EXPANSION");
+                        printf("%s\n", m.err.message);
+                    }
+
+                    break;
                 case '.':
                     t.kind = PERIOD;
-                    list_push(sc->tokens, &t);
-                    break;
-                case ':':
-                    t.kind = COLON;
                     list_push(sc->tokens, &t);
                     break;
                 case '*':
@@ -125,13 +204,14 @@ result(bool) _scanner_tokenize_expression(scanner *sc) {
                 default:
                     result(token) result;
                     if(isalpha(t.character)) {
-                        result = _scanner_identifier_token(sc, t.character);
+                        result = _scanner_identifier_token(sc, string_builder, t.character);
                         list_push(sc->tokens, &result.result);
                     }else if(isdigit(t.character)) {
-                        result = _scanner_number_token(sc, t.character);
+                        result = _scanner_number_token(sc, string_builder, t.character);
                         list_push(sc->tokens, &result.result);
                     }else {
                         LOG("Unknown token: %c, at %zu:%zu", t.character, t.line, t.column);
+                        delete_list(string_builder);
                         RESULT_ERROR_RETURN(bool, "Uknown token", UNKNOWN_TOKEN);
                     }
             };
@@ -140,14 +220,14 @@ result(bool) _scanner_tokenize_expression(scanner *sc) {
     }
 
     // Validating proper separation of cells
-//    token *list = (token*)sc->tokens;
-//    for(size_t i = 0; i < sc->tokens->len; i++) {
-//        if(list[i].kind != COMMA && list[i].kind != NEWLINE && i + 1 < sc->tokens->len) {
-//            if(list[i+1].kind == COMMA || list[i].kind == NEWLINE) {
-//                RESULT_ERROR_RETURN(bool, "Cannot contain more than one component per cell", UNEXPECTED_TOKEN);
-//            }
-//        }
-//    }
+    //    token *list = (token*)sc->tokens;
+    //    for(size_t i = 0; i < sc->tokens->len; i++) {
+    //        if(list[i].kind != COMMA && list[i].kind != NEWLINE && i + 1 < sc->tokens->len) {
+    //            if(list[i+1].kind == COMMA || list[i].kind == NEWLINE) {
+    //                RESULT_ERROR_RETURN(bool, "Cannot contain more than one component per cell", UNEXPECTED_TOKEN);
+    //            }
+    //        }
+    //    }
 
     RESULT_RETURN(bool, true);
 }
@@ -181,22 +261,24 @@ void _scanner_tokenize_string(scanner *sc) {
 result(bool) scanner_start_scan(scanner *sc) {
     NULL_ARGUMENT_ERROR_RETURN(bool, sc);
 
+    list(char) string_builder = new_list(char);
 
     for(result(char) ch_result = bf_get_char(sc->br);
-        ch_result.status == OK;
-        ch_result = bf_get_char(sc->br)) 
+    ch_result.status == OK;
+    ch_result = bf_get_char(sc->br)) 
     {
         if(isspace(ch_result.result)) {
             continue;
         }else if(ch_result.result == '=' || isdigit(ch_result.result)) {
             sc->br->index--;
-            _scanner_tokenize_expression(sc);
+            _scanner_tokenize_expression(sc, string_builder);
         }else {
             sc->br->index--;
             _scanner_tokenize_string(sc);
         }
     }
 
+    delete_list(string_builder);
     RESULT_RETURN(bool, true);
 }
 
@@ -205,8 +287,8 @@ bool _scanner_is_identifier_token(result(char) ch) {
     return isalnum(ch.result);
 }
 
-result(token) _scanner_identifier_token(scanner *sc, char first_ch) {
-    list(char) string_builder = new_list(char);
+result(token) _scanner_identifier_token(scanner *sc, list(char) string_builder, char first_ch) {
+    list_clear(string_builder);
     list_push(string_builder, &first_ch);
 
     while(_scanner_is_identifier_token(bf_peek_char(sc->br))) {
@@ -216,7 +298,6 @@ result(token) _scanner_identifier_token(scanner *sc, char first_ch) {
     list_push_rv(string_builder, '\0');
 
     char *str = strdup((char*)string_builder->list);
-    delete_list(string_builder);
 
     RESULT_RETURN(token, token_new_id(sc->br->line, sc->br->column, sc->br->index, str));
 }
@@ -231,8 +312,8 @@ bool _scanner_is_number_token(result(char) ch, bool found_dot) {
     return false; // Unreachable, all cases in switch are covered
 }
 
-result(token) _scanner_number_token(scanner *sc, char first_ch) {
-    list(char) number_builder = new_list(char);
+result(token) _scanner_number_token(scanner *sc, list(char) number_builder, char first_ch) {
+    list_clear(number_builder);
     list_push(number_builder, &first_ch);
 
     bool found_dot = false;
@@ -247,7 +328,6 @@ result(token) _scanner_number_token(scanner *sc, char first_ch) {
     list_push_rv(number_builder, '\0');
 
     double num = strtod((char*)number_builder->list, NULL);
-    delete_list(number_builder);
 
     RESULT_RETURN(token, token_new_num(sc->br->line, sc->br->column, sc->br->index, num));
 }

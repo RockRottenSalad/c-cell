@@ -34,6 +34,7 @@ list_push(LIST, &__r);\
 }while(0)
 void list_push(struct dynamic_list *list_ptr, void *data);
 
+void list_clear(struct dynamic_list *list_ptr);
 
 void list_pop(struct dynamic_list *list_ptr);
 

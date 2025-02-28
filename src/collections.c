@@ -68,9 +68,15 @@ void list_push(struct dynamic_list *list_ptr, void *data) {
     list_ptr->len += 1;
 }
 
+// TODO 
+// Consider shrinking list
+void list_clear(struct dynamic_list *list_ptr) {
+    list_ptr->len = 0;
+}
+
 void list_pop(struct dynamic_list *list_ptr) {
     list_ptr->len -= 1;
-    memset(list_ptr->list + (list_ptr->len * list_ptr->type_size), 0, list_ptr->type_size);
+//    memset(list_ptr->list + (list_ptr->len * list_ptr->type_size), 0, list_ptr->type_size);
 
     if(list_ptr->len <= list_ptr->capacity / 4) {
         _list_shrink(list_ptr, list_ptr->capacity / 2);
